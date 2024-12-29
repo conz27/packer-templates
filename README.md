@@ -1,5 +1,21 @@
 # Packer Templates mainly for the Vagrant [libvirt][libvirt] and [VirtualBox][virtualbox]
 
+> ⚠️ **Outdated repository**
+>
+> This GitHub repository is outdated and no longer actively maintained.
+> Feel free to fork it if needed.
+>
+> Things which may still be handy:
+>
+> * The packer template build process is using [Ansible](https://github.com/ruzickap/packer-templates/tree/main/ansible)
+>   to configure the Linux/Windows VMs.
+> * Packer build process is using GitHub Action + [MacOS runners](https://github.com/ruzickap/packer-templates/blob/c7ee52ca72c4295c982fa952b5e5f235ad9ffd92/.github/workflows/build.yml#L155)
+>   to build the images which are uploaded to [Vagrant Cloud](https://app.vagrantup.com/boxes/search?utf8=%E2%9C%93&sort=downloads&provider=&q=peru).
+>
+> Anyway - I recommend to use some other alternatives...
+
+---
+
 ## Customized+Clean/Minimal boxes for [libvirt][libvirt] and [VirtualBox][virtualbox]
 
 [libvirt]: https://github.com/vagrant-libvirt/vagrant-libvirt
@@ -148,7 +164,9 @@ with Packer.
   sudo apt install --no-install-recommends -y /tmp/vagrant_x86_64.deb
   rm /tmp/vagrant_x86_64.deb
 
-  sudo gpasswd -a ${USER} kvm ; sudo gpasswd -a ${USER} libvirt ; sudo gpasswd -a ${USER} vboxusers
+  sudo gpasswd -a "${USER}" kvm
+  sudo gpasswd -a "${USER}" libvirt
+  sudo gpasswd -a "${USER}" vboxusers
 
   vagrant plugin install vagrant-libvirt
   ```
@@ -160,8 +178,8 @@ with Packer.
 
   ```bash
   echo 'deb http://deb.debian.org/debian bullseye main contrib non-free' | sudo tee /etc/apt/sources.list.d/bullseye.list
-  sudo sed --regexp-extended 's/^([^#].+\s+main)$/\1 contrib non-free/;' --in-place /etc/apt/sources.list  ## Ensure required apt components are enabled.
-  cat <<EOF | sudo tee /etc/apt/preferences.d/bullseye.pref
+  sudo sed --regexp-extended 's/^([^#].+\s+main)$/\1 contrib non-free/;' --in-place /etc/apt/sources.list ## Ensure required apt components are enabled.
+  cat << EOF | sudo tee /etc/apt/preferences.d/bullseye.pref
   Explanation: Just install packages from bullseye if they are not in buster or buster-backports. Do not upgrade. Delete this file when you want to upgrade to bullseye.
   Package: *
   Pin: release o=Debian,n=bullseye
@@ -170,14 +188,15 @@ with Packer.
   sudo apt update
   sudo apt install -y ansible curl dnsmasq freerdp2-x11 git jq libc6-dev libvirt-daemon-system libvirt-dev python3-winrm qemu-kvm qemu-utils sshpass xorriso unzip packer/bullseye vagrant vagrant-libvirt
 
-  sudo gpasswd -a ${USER} kvm ; sudo gpasswd -a ${USER} libvirt
-  sudo gpasswd -a ${USER} vboxusers  ## If you have VirtualBox installed.
+  sudo gpasswd -a "${USER}" kvm
+  sudo gpasswd -a "${USER}" libvirt
+  sudo gpasswd -a "${USER}" vboxusers ## If you have VirtualBox installed.
   ```
 
 * Fedora requirements:
 
   ```bash
-  sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+  sudo dnf install "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
   sudo dnf install -y ansible curl freerdp git jq libvirt libvirt-devel qemu-kvm ruby-devel xorriso unzip VirtualBox
 
   PACKER_LATEST_VERSION="$(curl -s https://checkpoint-api.hashicorp.com/v1/check/packer | jq -r -M '.current_version')"
@@ -186,10 +205,12 @@ with Packer.
   rm /tmp/packer_linux_amd64.zip
 
   VAGRANT_LATEST_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/vagrant | jq -r -M '.current_version')
-  sudo dnf install -y https://releases.hashicorp.com/vagrant/${VAGRANT_LATEST_VERSION}/vagrant-${VAGRANT_LATEST_VERSION}-1.x86_64.rpm
+  sudo dnf install -y "https://releases.hashicorp.com/vagrant/${VAGRANT_LATEST_VERSION}/vagrant-${VAGRANT_LATEST_VERSION}-1.x86_64.rpm"
   CONFIGURE_ARGS="with-ldflags=-L/opt/vagrant/embedded/lib with-libvirt-include=/usr/include/libvirt with-libvirt-lib=/usr/lib64/libvirt" vagrant plugin install vagrant-libvirt
 
-  sudo gpasswd -a ${USER} kvm ; sudo gpasswd -a ${USER} libvirt ; sudo gpasswd -a ${USER} vboxusers
+  sudo gpasswd -a "${USER}" kvm
+  sudo gpasswd -a "${USER}" libvirt
+  sudo gpasswd -a "${USER}" vboxusers
   systemctl start libvirtd
   ```
 
@@ -237,41 +258,41 @@ cd packer-templates || exit
   export LOGDIR="/tmp/"
 
   # Ubuntu Server
-  NAME="ubuntu-20.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="ubuntu-20.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" ubuntu-server.json
 
-  NAME="ubuntu-18.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="ubuntu-18.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" ubuntu-server.json
 
-  NAME="ubuntu-16.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/xenial-updates/main/installer-amd64/current/images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="ubuntu-16.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/xenial-updates/main/installer-amd64/current/images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" ubuntu-server.json
 
   # Ubuntu Desktop
-  NAME="ubuntu-20.04-desktop-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/" \
-  UBUNTU_TYPE="desktop" \
+  export NAME="ubuntu-20.04-desktop-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/"
+  export UBUNTU_TYPE="desktop"
   packer build -only="qemu" ubuntu-desktop.json
 
   # Ubuntu Server - customized
-  NAME="my_ubuntu-20.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="my_ubuntu-20.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" my_ubuntu-server.json
 
-  NAME="my_ubuntu-18.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="my_ubuntu-18.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" my_ubuntu-server.json
 
-  NAME="my_ubuntu-16.04-server-amd64" \
-  UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/xenial-updates/main/installer-amd64/current/images/" \
-  UBUNTU_TYPE="server" \
+  export NAME="my_ubuntu-16.04-server-amd64"
+  export UBUNTU_IMAGES_URL="http://archive.ubuntu.com/ubuntu/dists/xenial-updates/main/installer-amd64/current/images/"
+  export UBUNTU_TYPE="server"
   packer build -only="qemu" my_ubuntu-server.json
   ```
 
@@ -291,13 +312,13 @@ cd packer-templates || exit
   ## Windows Server 2022
   export NAME="windows-server-2022-standard-x64-eval"
   export WINDOWS_VERSION="2022"
-  export ISO_URL="https://software-download.microsoft.com/download/sg/20348.169.210806-2348.fe_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
+  export ISO_URL="https://software-static.download.prss.microsoft.com/sg/download/888969d5-f34g-4e03-ac9d-1f9786c66749/SERVER_EVAL_x64FRE_en-us.iso"
   packer build -only="qemu" windows.json
 
   ## Windows Server 2019
   export NAME="windows-server-2019-standard-x64-eval"
   export WINDOWS_VERSION="2019"
-  export ISO_URL="https://software-download.microsoft.com/download/pr/17763.737.190906-2324.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us_1.iso"
+  export ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
   packer build -only="qemu" windows.json
 
   ## Windows Server 2016
@@ -310,7 +331,7 @@ cd packer-templates || exit
   export NAME="windows-10-enterprise-x64-eval"
   export WINDOWS_VERSION="10"
   export VIRTIO_WIN_ISO_DIR="/var/tmp/virtio-win"
-  export ISO_URL="https://software-download.microsoft.com/download/sg/444969d5-f34g-4e03-ac9d-1f9786c69161/19044.1288.211006-0501.21h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+  export ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
   export PACKER_IMAGES_OUTPUT_DIR="/var/tmp/"
   packer build -only="qemu" windows.json
 
@@ -318,7 +339,7 @@ cd packer-templates || exit
   export NAME="my_windows-10-enterprise-x64-eval"
   export WINDOWS_VERSION="10"
   export VIRTIO_WIN_ISO_DIR="/var/tmp/virtio-win"
-  export ISO_URL="https://software-download.microsoft.com/download/sg/444969d5-f34g-4e03-ac9d-1f9786c69161/19044.1288.211006-0501.21h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+  export ISO_URL="https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
   export PACKER_IMAGES_OUTPUT_DIR="/var/tmp/"
   packer build -only="qemu" my_windows.json
   ```

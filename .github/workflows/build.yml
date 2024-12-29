@@ -14,7 +14,6 @@ on:
           - "ubuntu-20.04-desktop-amd64"
           - "ubuntu-20.04-server-amd64"
           - "windows-10-enterprise-x64-eval"
-          - "windows-server-2016-standard-x64-eval"
           - "windows-server-2019-standard-x64-eval"
           - "windows-server-2022-standard-x64-eval"
         required: false
@@ -38,7 +37,6 @@ on:
       ANSIBLE_DEBUG:
         type: choice
         description: ANSIBLE_DEBUG (true, false)
-        default: "false"
         options:
           - "false"
           - "true"
@@ -55,7 +53,6 @@ on:
       build_upload:
         type: choice
         description: Upload release to Vagrant Cloud
-        default: "false"
         options:
           - "false"
           - "true"
@@ -64,6 +61,7 @@ on:
     - cron: "0 1 1 * *"
 
 env:
+  PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   PACKER_IMAGES_OUTPUT_DIR: /var/tmp/packer-templates-images
   PACKER_CACHE_DIR: /var/tmp/packer_cache
   LOGDIR: /var/tmp/packer-templates-logs
@@ -71,6 +69,7 @@ env:
   VAGRANT_CLOUD_TOKEN: ${{ secrets.VAGRANT_CLOUD_TOKEN }}
   # Needed for Packer when calling ansible (https://github.com/ansible/ansible/issues/32499)
   OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
+  # Note: windows-server-2016-standard-x64-eval was disabled because it take more than 6 hour to build the image - which is above the GH Action limit
   BUILD_BOX_LIST: |
     (
       "my_windows-10-enterprise-x64-eval"
@@ -78,7 +77,6 @@ env:
       "ubuntu-20.04-desktop-amd64"
       "ubuntu-20.04-server-amd64"
       "windows-10-enterprise-x64-eval"
-      "windows-server-2016-standard-x64-eval"
       "windows-server-2019-standard-x64-eval"
       "windows-server-2022-standard-x64-eval"
     )
@@ -87,6 +85,8 @@ env:
       "libvirt"
       "virtualbox"
     )
+
+permissions: read-all
 
 jobs:
   generate-matrix:
@@ -152,7 +152,7 @@ jobs:
 
   build-boxes:
     name: "*"
-    runs-on: macos-10.15
+    runs-on: macos-14
     needs: generate-matrix
     if: ${{ needs.generate-matrix.outputs.MATRIX != '[]' && needs.generate-matrix.outputs.MATRIX != '' }}
     concurrency:
@@ -188,38 +188,53 @@ jobs:
           PACKER_VAGRANT_PROVIDER=$(echo "${STAGE}" | sed 's/.*-\([^@]*\).*/\1/')
           EOF
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
         with:
           submodules: true
 
       - name: Install packages
         run: |
           set -euxo pipefail
-          [[ -f /usr/local/bin/2to3 ]] && rm /usr/local/bin/2to3
-          # Remove unused packages to save some disk space
-          rm -rf /Users/runner/Library/Developer /Users/runner/Library/Android /Users/runner/hostedtoolcache /Users/runner/.dotnet
-          brew install bash coreutils gettext gnu-sed jq packer python hudochenkov/sshpass/sshpass vagrant
+          brew install ansible bash coreutils gnu-sed jq packer hudochenkov/sshpass/sshpass hashicorp/tap/hashicorp-vagrant
+
           if [[ "${PACKER_VAGRANT_PROVIDER}" = "libvirt" ]]; then
             brew install qemu xorriso
+            qemu-system-x86_64 --version
           fi
+
           if [[ "${PACKER_VAGRANT_PROVIDER}" = "virtualbox" ]]; then
             brew install virtualbox
-            # brew install --cask virtualbox-extension-pack
+            vboxmanage --version
           fi
-          # renovate: datasource=pypi depName=ansible
-          ANSIBLE_VERSION="5.10.0"
-          pip3 install ansible=="${ANSIBLE_VERSION}"
+
+          packer plugins install github.com/hashicorp/ansible
+          packer plugins install github.com/hashicorp/qemu
+          packer plugins install github.com/hashicorp/vagrant
+          packer plugins install github.com/hashicorp/virtualbox
+
+          vagrant --version
+          packer --version
+          ansible --version
+
           if [[ "${BUILD}" =~ windows ]]; then
             # renovate: datasource=pypi depName=pywinrm
-            PYWINRM_VERSION="0.4.3"
+            PYWINRM_VERSION="0.5.0"
             pip3 install pywinrm=="${PYWINRM_VERSION}"
-            # renovate: datasource=galaxy-collection depName=ansible.windows
-            ANSIBLE_WINDOWS_VERSION="1.13.0"
-            # renovate: datasource=galaxy-collection depName=chocolatey.chocolatey
-            ANSIBLE_CHOCOLATEY_VERSION="1.4.0"
-            ansible-galaxy collection install ansible.windows:="${ANSIBLE_WINDOWS_VERSION}" chocolatey.chocolatey:="${ANSIBLE_CHOCOLATEY_VERSION}"
+            ansible-galaxy collection install --force -r ansible/requirements.yml
           fi
+
           echo "/usr/local/bin:/usr/local/opt/gnu-sed/libexec/gnubin:/usr/local/opt/coreutils/libexec/gnubin" >> "${GITHUB_PATH}"
+
+          # Remove unused packages to save some disk space
+          rm -rf /Users/runner/Library/Developer /Users/runner/Library/Android /Users/runner/hostedtoolcache /Users/runner/.dotnet
+
+          # Used by mxschmitt/action-tmate
+          touch continue
+
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+      #   with:
+      #     limit-access-to-actor: true
 
       - name: Build image
         id: build_image
@@ -227,12 +242,12 @@ jobs:
           ./build.sh "${BUILD}"
 
       - name: Upload logs to GitHub artifact store in case of VirtualBox failure
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && (steps.build_image.outcome == 'failure') && contains(matrix.stage, 'virtualbox') }}
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
+        if: ${{ always() && contains(matrix.stage, 'virtualbox') }}
         with:
           name: ${{ matrix.stage }}
           path: ${{ env.LOGDIR }}/*
-          retention-days: 1
+          retention-days: 3
 
       - name: Check the created box image
         run: |
@@ -246,12 +261,6 @@ jobs:
         if: ${{ github.event_name == 'schedule' || github.event.inputs.build_upload == 'true' }}
         run: |
           ./upload_box_to_vagrantcloud.sh "${VAGRANT_CLOUD_USER}@${PACKER_IMAGES_OUTPUT_DIR}/${BUILD}.box"
-
-      # - name: Setup tmate session
-      #   if: ${{ failure() }}
-      #   uses: mxschmitt/action-tmate@v3
-      #   with:
-      #     limit-access-to-actor: true
 
   clean_check_versions:
     needs: build-boxes

@@ -1,4 +1,4 @@
-name: Links
+name: links
 
 on:
   workflow_dispatch:
@@ -7,20 +7,30 @@ on:
       - main
     paths:
       - .github/workflows/links.yml
+      - lychee.toml
       - "**.md"
   schedule:
-    - cron: "0 3 * * 1"
+    - cron: "0 0 * * 2"
+
+permissions: read-all
 
 jobs:
-  linkChecker:
+  links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+
+      - name: Restore lychee cache
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
 
       - name: Link Checker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        uses: lycheeverse/lychee-action@v1.5.4
+        uses: lycheeverse/lychee-action@f796c8b7d468feb9b8c0a46da3fac0af6874d374 # v2.2.0
         with:
           args: ". --no-progress --exclude-path CHANGELOG.md --exclude-all-private --exclude 'GITHUB_SHA%7D|_VERSION%7D|_TYPE%7D'"
-          fail: true

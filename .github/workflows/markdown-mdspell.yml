@@ -9,17 +9,19 @@ on:
       - .github/workflows/markdown-mdspell.yml
       - .spelling
 
+permissions: read-all
+
 jobs:
   markdown-mdspell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           # renovate: datasource=github-tags depName=nodejs/node versioning=node
-          node-version: 18
+          node-version: 22
 
       - name: Install markdown-spellcheck
         run: npm install -g markdown-spellcheck

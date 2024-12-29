@@ -1,19 +1,16 @@
-name: Renovate
+---
+name: renovate
 
 on:
   workflow_dispatch:
     inputs:
       dryRun:
-        type: choice
-        description: "Dry-Run"
-        default: "false"
-        options:
-          - true
-          - false
+        type: boolean
+        description: Dry-Run
       logLevel:
         type: choice
-        description: "Log-Level"
-        default: "debug"
+        description: Log-Level
+        default: debug
         options:
           - info
           - debug
@@ -21,43 +18,47 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/renovate.json5"
+      - "!renovate/*"
   schedule:
-    - cron: "0 0,2,4 * * *"
+    - cron: 0 0-3 * * 0
 
 env:
-  LOG_LEVEL: info
-  RENOVATE_CONFIG_FILE: .github/renovate.json5
-  RENOVATE_DRY_RUN: false
+  # keep-sorted start
+  # https://docs.renovatebot.com/troubleshooting/#log-debug-levels
+  LOG_LEVEL: ${{ inputs.logLevel || 'debug' }}
+  RENOVATE_AUTOMERGE: "true"
+  # Renovate Automerge
+  RENOVATE_AUTOMERGE_TYPE: branch
+  # https://docs.renovatebot.com/self-hosted-configuration/#dryrun
+  # Run renovate in dry-run mode if executed in branches other than main - prevents versions in PRs/branches from being updated
+  RENOVATE_DRY_RUN: ${{ inputs.dryRun || ( github.head_ref || github.ref_name ) != 'main' || false }}
+  # https://docs.renovatebot.com/configuration-options/#platformcommit
+  RENOVATE_PLATFORM_COMMIT: "true"
+  # https://docs.renovatebot.com/self-hosted-configuration/#repositories
   RENOVATE_REPOSITORIES: ${{ github.repository }}
+  # https://docs.renovatebot.com/self-hosted-configuration/#username
   RENOVATE_USERNAME: ${{ github.repository_owner }}
-  RENOVATE_GIT_AUTHOR: "Renovate Bot <bot@renovateapp.com>"
+  # keep-sorted end
+
+permissions: read-all
 
 jobs:
   renovate:
     runs-on: ubuntu-latest
     concurrency:
-      group: renovate
+      group: ${{ github.workflow }}-${{ github.ref }}
+    permissions: write-all
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Generate Token
-        uses: tibdex/github-app-token@v1
-        id: generate-token
+      - uses: actions/create-github-app-token@c1a285145b9d317df6ced56c09f525b5c2b6f755 # v1.11.1
+        id: app-token
         with:
-          app_id: ${{ secrets.MY_RENOVATE_GITHUB_APP_ID }}
-          private_key: "${{ secrets.MY_RENOVATE_GITHUB_PRIVATE_KEY }}"
+          app-id: ${{ secrets.MY_RENOVATE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.MY_RENOVATE_GITHUB_PRIVATE_KEY }}
 
-      - name: Override default config from dispatch variables
-        run: |
-          echo "RENOVATE_DRY_RUN=${{ github.event.inputs.dryRun || env.RENOVATE_DRY_RUN }}" | tee -a "${GITHUB_ENV}"
-          echo "LOG_LEVEL=${{ github.event.inputs.logLevel || env.LOG_LEVEL }}" | tee -a "${GITHUB_ENV}"
-          echo "RENOVATE_BASE_BRANCHES=${GITHUB_REF##*/}" | tee -a "${GITHUB_ENV}"
-
-      - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v34.77.0
+      - name: 💡 Self-hosted Renovate
+        uses: renovatebot/github-action@67a664fc9b4481b33a3eff6ee9edfb7a7b9dfa1e # v41.0.2
         with:
-          configurationFile: "${{ env.RENOVATE_CONFIG_FILE }}"
-          token: "x-access-token:${{ steps.generate-token.outputs.token }}"
+          token: ${{ steps.app-token.outputs.token }}

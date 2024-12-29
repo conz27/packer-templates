@@ -1,41 +1,45 @@
-name: MegaLinter
+---
+name: mega-linter
 
 on:
   workflow_dispatch:
   push:
+    branches-ignore:
+      - main
+
+permissions: read-all
 
 jobs:
-  build:
-    name: MegaLinter
+  mega-linter:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Restore lychee cache
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
 
       - name: Extract commands from markdown files
         run: |
           set -euxo pipefail
           echo '#!/usr/bin/env bash' > README.sh
-          find . -name '*.md' -print0 | while IFS= read -r -d '' FILE ; do
-            sed -n "/^\`\`\`\(bash\|shell\).*/,/^\`\`\`$/p" "${FILE}" \
-            | \
-            sed \
-              -e 's/^```\(bash\|shell\).*//' \
-              -e '/^```$/d' \
-            >> README.sh
+          find . -name '*.md' -print0 | while IFS= read -r -d '' FILE; do
+            # Extract: ```bash ... ```
+            sed -n "/^\`\`\`\(bash\|shell\)$/,/^\`\`\`$/p" "${FILE}" | sed '/^```*/d' >> README.sh
+            # Extract:   ```bash ... ```
+            sed -n "/^  \`\`\`\(bash\|shell\)$/,/^  \`\`\`$/p" "${FILE}" | sed '/^  ```*/d; s/^  //' >> README.sh
           done
           chmod a+x README.sh
 
-      - name: MegaLinter
-        uses: megalinter/megalinter@v6.17.0
+      - name: 💡 MegaLinter
+        uses: oxsecurity/megalinter@1fc052d03c7a43c78fe0fee19c9d648b749e0c01 # v8.3.0
         env:
-          BASH_SHFMT_ARGUMENTS: --indent 2 --space-redirects
-          DISABLE_LINTERS: COPYPASTE_JSCPD,JSON_PRETTIER,MARKDOWN_MARKDOWN_LINK_CHECK,REPOSITORY_DEVSKIM,REPOSITORY_SEMGREP,SPELL_CSPELL,SPELL_PROSELINT,YAML_V8R
-          FILTER_REGEX_EXCLUDE: '(.*\.ps1|CHANGELOG.md)'
-          FORMATTERS_DISABLE_ERRORS: false
           GITHUB_COMMENT_REPORTER: false
-          GITHUB_STATUS_REPORTER: true
+          # Disabled due to error: [GitHub Status Reporter] Error posting Status for REPOSITORY with ...: 403
+          GITHUB_STATUS_REPORTER: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRINT_ALPACA: false
-          # Needed for scanning generated README.sh file
-          VALIDATE_ALL_CODEBASE: true
